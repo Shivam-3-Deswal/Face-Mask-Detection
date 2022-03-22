@@ -1,0 +1,153 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
+
+import cv2
+import os
+import numpy as np
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
+
+cv2_base_dir = os.path.dirname(os.path.abspath(cv2.__file__)) 
+haar_model = os.path.join(cv2_base_dir, 'data/haarcascade_frontalface_default.xml')
+haar_data = cv2.CascadeClassifier('data.xml')
+face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+
+# In[2]:
+
+
+with_mask = np.load("with_mask.npy")
+
+
+# In[3]:
+
+
+without_mask = np.load("without_mask.npy")
+
+
+# In[4]:
+
+
+with_mask.shape
+
+
+# In[5]:
+
+
+without_mask.shape
+
+
+# In[6]:
+
+
+with_mask = with_mask.reshape(200,50*50*3)
+without_mask = without_mask.reshape(200,50*50*3)
+
+
+# In[7]:
+
+
+with_mask.shape
+
+
+# In[8]:
+
+
+without_mask.shape
+
+
+# In[9]:
+
+
+x = np.r_[with_mask,without_mask]
+
+
+# In[10]:
+
+
+x.shape
+
+
+# In[11]:
+
+
+labels = np.zeros(x.shape[0])
+
+
+# In[12]:
+
+
+labels[200:] = 1
+
+
+# In[13]:
+
+
+names = {0 : "MASK", 1 : "NO MASK"}
+
+
+# In[14]:
+
+
+x_train,x_test,y_train,y_test = train_test_split(x,labels,test_size = 0.22)
+
+
+# In[15]:
+
+
+x_train.shape
+
+
+# In[16]:
+
+
+pca = PCA(n_components = 3)
+x_train = pca.fit_transform(x_train)
+
+
+# In[17]:
+
+
+x_train.shape
+
+
+# In[18]:
+
+
+svm = SVC()
+svm.fit(x_train,y_train)
+
+x_test = pca.transform(x_test)
+y_pred = svm.predict(x_test)
+
+
+# In[ ]:
+
+
+capture = cv2.VideoCapture(0)
+font = cv2.FONT_HERSHEY_COMPLEX
+while True:
+    flag,img = capture.read()
+    if flag:
+        faces = face_cascade.detectMultiScale(img)
+        for x,y,w,h in faces:
+            cv2.rectangle(img, (x,y), (x+w,y+h), (255,0,255), 4)
+            face = img[y:y+h, x:x+w, :]
+            face = cv2.resize(face,(50,50)) 
+            face = face.reshape(1,-1)
+            face = pca.transform(face)
+            pred = svm.predict(face)
+            n = names[int(pred)]
+            cv2.putText(img,n, (x,y), font, 1, (244,259,250), 2)
+        cv2.imshow("Result",img)
+        if cv2.waitKey(2) == 27:
+            break
+capture.release()
+cv2.destroyAllWindows()
+
